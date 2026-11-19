@@ -104,7 +104,9 @@ Kiểm tra file ngoại tuyến theo cùng schema của đề.
 python -c "import json, jsonschema; from pathlib import Path; read = lambda p: json.loads(Path(p).read_text(encoding='utf-8')); jsonschema.validate(read('outputs/offline/results.json'), read('schemas/results.schema.json')); print('Schema hợp lệ')"
 ```
 
-Để chạy với model Blue thật, sao chép `.env.example` thành `.env` nếu chưa có, điền `OPENROUTER_API_KEY` và chạy lệnh dưới đây. Blue theo cấu hình của đề dùng `liquid/lfm-3-1.7b:free`. Chỉ dùng dữ liệu mô phỏng khi thực hành với nhà cung cấp model. Giữ `.env` trên máy.
+Để chạy với model Blue thật, tạo khóa tại [trang API Keys của OpenRouter](https://openrouter.ai/keys). Nếu chưa có `.env`, sao chép `.env.example` thành `.env`, rồi điền khóa vào dòng `OPENROUTER_API_KEY=` trong `.env`. Giữ khóa trên máy. Blue theo cấu hình của đề dùng `liquid/lfm-3-1.7b:free`.
+
+Nếu OpenRouter trả HTTP 404 với lý do `Free model training violation (account settings)`, chính sách hiện tại đang loại nhà cung cấp của model miễn phí này. Nếu đồng ý cho nhà cung cấp có thể dùng prompt và đầu ra để huấn luyện, bạn có thể bật quyền tương ứng cho model miễn phí tại [Privacy Settings](https://openrouter.ai/settings/privacy) trước khi chạy lại. Chỉ dùng dữ liệu mô phỏng của lab cho lần chạy này. [Chính sách dữ liệu của nhà cung cấp](https://openrouter.ai/docs/guides/privacy/provider-logging).
 
 ```bash
 python src/main.py --part 3
