@@ -9,6 +9,7 @@ Gemini Red Team dùng Google ADK trong agents/*.py — không đi qua file này.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from inspect import isawaitable
 from typing import Any, Callable
 
 from core.config import (
@@ -49,18 +50,39 @@ class OpenAIRunner:
     def _client(self):
         from openai import OpenAI
 
-        return OpenAI(**(self.client_kwargs or {}))
+        client_kwargs = self.client_kwargs or {}
+        if self.provider == get_blue_provider() and not client_kwargs.get("api_key"):
+            raise RuntimeError("Cần OPENROUTER_API_KEY để gọi model Blue.")
+        return OpenAI(**client_kwargs)
 
-    async def chat(self, agent: OpenAIAgent, user_message: str) -> str:
+    async def chat(
+        self,
+        agent: OpenAIAgent,
+        user_message: str,
+        *,
+        user_id: str = "student",
+        on_decision: Callable[[str], None] | None = None,
+        complete: Callable[[OpenAIAgent, str], str] | None = None,
+    ) -> str:
+        """Run the plugins around a live or deterministic completion."""
         for hook in self.input_hooks:
             blocked = hook(user_message)
             if blocked:
                 return blocked
 
-        block_msg = await self._run_input_plugins(user_message)
+        block_msg = await self._run_input_plugins(
+            user_message, user_id=user_id, on_decision=on_decision
+        )
         if block_msg is not None:
             return block_msg
 
+        text = (complete or self._complete)(agent, user_message).strip()
+        for hook in self.output_hooks:
+            text = hook(text)
+
+        return await self._run_output_plugins(text, on_decision=on_decision)
+
+    def _complete(self, agent: OpenAIAgent, user_message: str) -> str:
         client = self._client()
         completion = client.chat.completions.create(
             model=self.model,
@@ -70,49 +92,44 @@ class OpenAIRunner:
             ],
             temperature=self.temperature,
         )
-        text = (completion.choices[0].message.content or "").strip()
+        return completion.choices[0].message.content or ""
 
-        for hook in self.output_hooks:
-            text = hook(text)
-
-        text = await self._run_output_plugins(text)
-        return text
-
-    async def _run_input_plugins(self, user_message: str) -> str | None:
+    async def _run_input_plugins(
+        self,
+        user_message: str,
+        *,
+        user_id: str,
+        on_decision: Callable[[str], None] | None,
+    ) -> str | None:
         if not self.plugins:
             return None
-        try:
-            from google.genai import types
-        except ImportError:
-            return None
+        from google.genai import types
 
         user_content = types.Content(
             role="user",
             parts=[types.Part.from_text(text=user_message)],
         )
-        ctx = _MockInvocationContext()
+        ctx = _MockInvocationContext(user_id=user_id)
         for plugin in self.plugins:
             cb = getattr(plugin, "on_user_message_callback", None)
             if cb is None:
                 continue
-            try:
-                result = await cb(
-                    invocation_context=ctx, user_message=user_content
-                )
-            except TypeError:
-                result = cb(invocation_context=ctx, user_message=user_content)
+            result = cb(invocation_context=ctx, user_message=user_content)
+            if isawaitable(result):
+                result = await result
             if result is None:
                 continue
+            if on_decision is not None:
+                on_decision(plugin.name)
             return _content_to_text(result)
         return None
 
-    async def _run_output_plugins(self, text: str) -> str:
+    async def _run_output_plugins(
+        self, text: str, *, on_decision: Callable[[str], None] | None
+    ) -> str:
         if not self.plugins or not text:
             return text
-        try:
-            from google.genai import types
-        except ImportError:
-            return text
+        from google.genai import types
 
         content = types.Content(
             role="model", parts=[types.Part.from_text(text=text)]
@@ -127,17 +144,21 @@ class OpenAIRunner:
         class _Ctx:
             pass
 
+        previous_text = text
         for plugin in self.plugins:
             cb = getattr(plugin, "after_model_callback", None)
             if cb is None:
                 continue
-            try:
-                out = await cb(callback_context=_Ctx(), llm_response=llm_response)
-            except TypeError:
-                out = cb(callback_context=_Ctx(), llm_response=llm_response)
-            if out is not None and getattr(out, "content", None) is not None:
+            out = cb(callback_context=_Ctx(), llm_response=llm_response)
+            if isawaitable(out):
+                out = await out
+            if out is not None:
                 llm_response = out
-        return _content_to_text(llm_response.content) or text
+            current_text = _content_to_text(llm_response.content)
+            if on_decision is not None and current_text != previous_text:
+                on_decision(plugin.name)
+            previous_text = current_text
+        return previous_text
 
 
 def _content_to_text(content: Any) -> str:

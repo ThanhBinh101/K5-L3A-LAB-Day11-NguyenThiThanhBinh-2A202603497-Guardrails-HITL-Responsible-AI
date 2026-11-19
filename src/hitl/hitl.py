@@ -8,20 +8,6 @@ Lab 11 — Optional enrichment: Human-in-the-Loop Design
 from dataclasses import dataclass
 
 
-# ============================================================
-# Optional enrichment: ConfidenceRouter (không chấm)
-#
-# Route agent responses based on confidence scores:
-#   - HIGH (>= 0.9): Auto-send to user
-#   - MEDIUM (0.7 - 0.9): Queue for human review
-#   - LOW (< 0.7): Escalate to human immediately
-#
-# Special case: if the action is HIGH_RISK (e.g., money transfer,
-# account deletion), ALWAYS escalate regardless of confidence.
-#
-# Implement the route() method.
-# ============================================================
-
 HIGH_RISK_ACTIONS = [
     "transfer_money",
     "close_account",
@@ -60,88 +46,85 @@ class ConfidenceRouter:
         """Route a response based on confidence score and action type.
 
         Args:
-            response: The agent's response text
+            response: The proposed text. Routing uses its risk and confidence metadata.
             confidence: Confidence score between 0.0 and 1.0
             action_type: Type of action (e.g., "general", "transfer_money")
 
         Returns:
             RoutingDecision with routing action and metadata
         """
-        # Optional: Implement routing logic
-        #
-        # 1. Check if action_type is in HIGH_RISK_ACTIONS
-        #    -> If yes: always escalate (action="escalate", priority="high",
-        #       requires_human=True, reason="High-risk action: {action_type}")
-        #
-        # 2. Check confidence thresholds:
-        #    - confidence >= 0.9:
-        #      action="auto_send", priority="low",
-        #      requires_human=False, reason="High confidence"
-        #
-        #    - 0.7 <= confidence < 0.9:
-        #      action="queue_review", priority="normal",
-        #      requires_human=True, reason="Medium confidence — needs review"
-        #
-        #    - confidence < 0.7:
-        #      action="escalate", priority="high",
-        #      requires_human=True, reason="Low confidence — escalating"
+        action_type = action_type.strip().casefold()
+        if action_type in HIGH_RISK_ACTIONS:
+            return RoutingDecision(
+                "escalate", confidence, f"High-risk action: {action_type}", "high", True
+            )
 
-        return RoutingDecision(
-            action="auto_send",
-            confidence=confidence,
-            reason="TODO: implement routing logic",
-            priority="low",
-            requires_human=False,
-        )  # TODO: Replace with implementation
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not 0.0 <= confidence <= 1.0
+        ):
+            return RoutingDecision("escalate", confidence, "Invalid confidence", "high", True)
 
+        if confidence >= self.HIGH_THRESHOLD:
+            return RoutingDecision("auto_send", confidence, "High confidence", "low", False)
 
-# ============================================================
-# Optional enrichment: 3 HITL decision points (không chấm)
-# Không bắt buộc điền. Tóm tắt bài nộp: chạy scripts/grade.py
-# (tự sinh lab_report.md) — không viết report tay.
-#
-# For each decision point, define:
-# - trigger: What condition activates this HITL check?
-# - hitl_model: Which model? (human-in-the-loop, human-on-the-loop,
-#   human-as-tiebreaker)
-# - context_needed: What info does the human reviewer need?
-# - example: A concrete scenario
-# - approval_path: What approve/reject/timeout decision is recorded?
-# - audit_fields: Which correlation ID, intent and proposed action/diff are logged?
-#
-# Think about real banking scenarios where human judgment is critical.
-# ============================================================
+        if confidence >= self.MEDIUM_THRESHOLD:
+            return RoutingDecision(
+                "queue_review", confidence, "Medium confidence needs review", "normal", True
+            )
+
+        return RoutingDecision("escalate", confidence, "Low confidence", "high", True)
+
 
 hitl_decision_points = [
     {
         "id": 1,
-        "name": "TODO: Name this decision point",
-        "trigger": "TODO: When does this trigger?",
-        "hitl_model": "TODO: human-in-the-loop / human-on-the-loop / human-as-tiebreaker",
-        "context_needed": "TODO: What does the reviewer need to see?",
-        "example": "TODO: Give a concrete example scenario",
-        "approval_path": "TODO: Explain approve, reject and timeout behavior",
-        "audit_fields": "TODO: List correlation ID, intent, diff and reviewer decision",
+        "name": "Duyệt trước khi chuyển tiền",
+        "trigger": "Agent đề xuất thao tác chuyển tiền ở bất kỳ mức confidence nào.",
+        "hitl_model": "human-in-the-loop",
+        "context_needed": "Ý định đã xác minh, số tiền, loại tiền, tài khoản đích đã che và kết quả kiểm tra egress.",
+        "example": "Agent chuẩn bị lệnh chuyển 5 triệu đồng cho người nhận mới.",
+        "approval_path": (
+            "Giữ lệnh đến khi người có thẩm quyền duyệt chính xác nội dung đề xuất. "
+            "Kiểm tra lại egress trước khi thực thi. Từ chối hoặc hết hạn thì hủy lệnh và ghi trạng thái."
+        ),
+        "audit_fields": (
+            "correlation_id, intent, tham chiếu đến nội dung lệnh, reviewer_id, approval_id, "
+            "quyết định và thời điểm."
+        ),
     },
     {
         "id": 2,
-        "name": "TODO: Name this decision point",
-        "trigger": "TODO: When does this trigger?",
-        "hitl_model": "TODO: human-in-the-loop / human-on-the-loop / human-as-tiebreaker",
-        "context_needed": "TODO: What does the reviewer need to see?",
-        "example": "TODO: Give a concrete example scenario",
-        "approval_path": "TODO: Explain approve, reject and timeout behavior",
-        "audit_fields": "TODO: List correlation ID, intent, diff and reviewer decision",
+        "name": "Giám sát chất lượng tự động trả lời",
+        "trigger": "Tỷ lệ chặn hoặc che thông tin tăng vượt ngưỡng trong cửa sổ theo dõi.",
+        "hitl_model": "human-on-the-loop",
+        "context_needed": "Chỉ số theo thời gian, phiên bản policy, lớp chặn và mẫu đã che dữ liệu nhạy cảm.",
+        "example": "Tỷ lệ che nội dung tăng sau khi cập nhật nguồn dữ liệu cho thẻ tín dụng.",
+        "approval_path": (
+            "Tạm dừng trả lời tự động cho luồng bị ảnh hưởng khi cảnh báo kích hoạt. "
+            "Người trực duyệt mở lại sau khi kiểm tra. Nếu từ chối hoặc hết hạn, giữ trạng thái tạm dừng."
+        ),
+        "audit_fields": (
+            "correlation_id, alert_id, policy_version, chỉ số, lý do, phạm vi tạm dừng, "
+            "reviewer_id, quyết định và thời điểm."
+        ),
     },
     {
         "id": 3,
-        "name": "TODO: Name this decision point",
-        "trigger": "TODO: When does this trigger?",
-        "hitl_model": "TODO: human-in-the-loop / human-on-the-loop / human-as-tiebreaker",
-        "context_needed": "TODO: What does the reviewer need to see?",
-        "example": "TODO: Give a concrete example scenario",
-        "approval_path": "TODO: Explain approve, reject and timeout behavior",
-        "audit_fields": "TODO: List correlation ID, intent, diff and reviewer decision",
+        "name": "Xử lý nguồn chính sách mâu thuẫn",
+        "trigger": "Hai nguồn chính thức đưa ra điều kiện khác nhau cho cùng một sản phẩm.",
+        "hitl_model": "human-as-tiebreaker",
+        "context_needed": "Câu hỏi đã che dữ liệu nhạy cảm, đoạn trích, mã phiên bản và thời điểm hiệu lực của từng nguồn.",
+        "example": "Hai tài liệu nêu mức phí khác nhau cho tất toán khoản vay trước hạn.",
+        "approval_path": (
+            "Chuyên viên chọn nguồn đang có hiệu lực và duyệt bản trả lời có dẫn nguồn. "
+            "Nếu từ chối hoặc hết hạn, mở yêu cầu xác minh và báo khách đang chờ kiểm tra."
+        ),
+        "audit_fields": (
+            "correlation_id, intent, source_ids, phiên bản, tham chiếu bản trả lời đề xuất, "
+            "reviewer_id, quyết định và thời điểm."
+        ),
     },
 ]
 
@@ -188,6 +171,8 @@ def test_hitl_points():
         print(f"    Model:    {point['hitl_model']}")
         print(f"    Context:  {point['context_needed']}")
         print(f"    Example:  {point['example']}")
+        print(f"    Approval: {point['approval_path']}")
+        print(f"    Audit:    {point['audit_fields']}")
     print("\n" + "=" * 60)
 
 

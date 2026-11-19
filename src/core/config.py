@@ -18,6 +18,8 @@ Hai tầng model (không trộn):
 from __future__ import annotations
 
 import os
+import sys
+from getpass import getpass
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -234,25 +236,29 @@ def is_harder_model() -> bool:
     return any(x in m for x in ("gpt-5.6", "pro", "gemini-3.8", "gemini-3.7"))
 
 
-def setup_api_key():
-    """Ensure keys for Blue (OpenRouter) + Red / Red Advance (OpenAI or Gemini)."""
-    if not get_openrouter_api_key():
-        os.environ["OPENROUTER_API_KEY"] = input(
-            "Enter OpenRouter API Key (Blue): "
-        ).strip()
-    print(f"Blue  — {blue_provider_label()}  [LOCKED]")
+def _require_api_key(name: str, label: str) -> None:
+    if not os.environ.get(name, "").strip() and sys.stdin.isatty():
+        os.environ[name] = getpass(f"{label} API key: ").strip()
+    if not os.environ.get(name, "").strip():
+        raise SystemExit(f"Thiếu {name}. Hãy cấu hình biến này trong .env hoặc môi trường.")
 
-    red = get_red_provider()
+
+def setup_api_key(*, blue: bool = True, red: bool = True) -> None:
+    """Require only the API keys needed by the selected checkpoints."""
+    if blue:
+        _require_api_key("OPENROUTER_API_KEY", "OpenRouter (Blue)")
+        print(f"Blue  — {blue_provider_label()}  [LOCKED]")
+    if not red:
+        return
+
+    provider = get_red_provider()
     model = get_red_model()
-    if red == PROVIDER_GEMINI:
-        if not os.environ.get("GOOGLE_API_KEY", "").strip():
-            os.environ["GOOGLE_API_KEY"] = input("Enter Google API Key (Red): ").strip()
+    if provider == PROVIDER_GEMINI:
+        _require_api_key("GOOGLE_API_KEY", "Google (Red)")
         os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "0"
-        print(f"Red / Red Advance  — gemini:{model}")
     else:
-        if not get_openai_api_key():
-            os.environ["OPENAI_API_KEY"] = input("Enter OpenAI API Key (Red): ").strip()
-        print(f"Red / Red Advance  — openai:{model}")
+        _require_api_key("OPENAI_API_KEY", "OpenAI (Red)")
+    print(f"Red / Red Advance  — {provider}:{model}")
 
     print(
         "Bonus: chọn một — Red tối đa +5 (B1) hoặc Red Advance tối đa +10 (B2)."

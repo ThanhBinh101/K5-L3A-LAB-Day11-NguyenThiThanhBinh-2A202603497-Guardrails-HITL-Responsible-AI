@@ -1,1 +1,1 @@
-"""Assignment 11 starters — rate limiter, audit, monitoring, pipeline assembly."""
+"""Assignment 11 — rate limiting, audit, monitoring and pipeline assembly."""

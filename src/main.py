@@ -6,11 +6,12 @@ Chạy từ **gốc repo** (không cần ``cd src``):
     python src/main.py              # Core: Checkpoint 2 → 3 → 4
     python src/main.py --part 2     # Checkpoint 2 — guardrails
     python src/main.py --part 3     # Checkpoint 3 — pipeline / results.json
+    python src/main.py --part 3 --offline  # Blue fixture → outputs/offline/
     python src/main.py --part 4     # Checkpoint 4 — Red / Red Advance
 
 File JSON luôn ghi vào ``<repo>/outputs/`` (không phụ thuộc thư mục hiện tại).
 
-Tham khảo (không chấm, không có CLI): ``src/testing/``, ``src/hitl/``.
+Tham khảo (không chấm): ``src/testing/``, ``python src/hitl/hitl.py``.
 """
 from __future__ import annotations
 
@@ -51,7 +52,7 @@ async def part2_guardrails():
     print("(LLM-as-Judge / NeMo — optional, skipped)")
 
 
-async def part3_assignment_suite():
+async def part3_assignment_suite(*, offline: bool = False):
     """Checkpoint 3: defense suite → outputs/results.json."""
     print("\n" + "=" * 60)
     print("CHECKPOINT 3: Assignment suite → outputs/*.json")
@@ -63,22 +64,13 @@ async def part3_assignment_suite():
         run_assignment_suite,
     )
 
-    try:
-        plugins = build_production_plugins(use_llm_judge=False)
-        audit, monitor = build_observability()
-        pipeline = {"plugins": plugins, "audit": audit, "monitor": monitor}
-        result = await run_assignment_suite(pipeline)
-        print("Suite finished.")
-        print("Wrote outputs under repo outputs/")
-        return result
-    except NotImplementedError as e:
-        print(
-            "Chưa xong Checkpoint 3 (src/assignment/pipeline.py). "
-            "Hoàn thành rồi chạy lại từ gốc repo:\n"
-            "  python src/main.py --part 3"
-        )
-        print(f"Detail: {e}")
-        return None
+    plugins = build_production_plugins(use_llm_judge=False)
+    audit, monitor = build_observability()
+    pipeline = {"plugins": plugins, "audit": audit, "monitor": monitor, "offline": offline}
+    result = await run_assignment_suite(pipeline)
+    output_dir = "outputs/offline/" if offline else "outputs/"
+    print(f"Đã ghi kết quả Blue vào {output_dir}")
+    return result
 
 
 async def part4_attacks():
@@ -133,24 +125,27 @@ async def part4_attacks():
     }
 
 
-async def main(parts=None):
-    setup_api_key()
-
+async def main(parts=None, *, offline: bool = False):
     if parts is None:
-        parts = [2, 3, 4]  # Core: CP2 → CP3 → CP4
+        parts = [2, 3] if offline else [2, 3, 4]
+    if offline and 4 in parts:
+        raise ValueError("Chế độ --offline chỉ hỗ trợ các checkpoint Blue.")
 
     for part in parts:
         if part == 2:
             await part2_guardrails()
         elif part == 3:
-            await part3_assignment_suite()
+            if not offline:
+                setup_api_key(blue=True, red=False)
+            await part3_assignment_suite(offline=offline)
         elif part == 4:
+            setup_api_key(blue=False, red=True)
             await part4_attacks()
         else:
             print(f"Unknown part: {part}. Dùng --part 2, 3, hoặc 4.")
 
     print("\n" + "=" * 60)
-    print("Lab 11 complete! Check your results above.")
+    print("Đã chạy xong các checkpoint đã chọn.")
     print("=" * 60)
 
 
@@ -167,9 +162,12 @@ if __name__ == "__main__":
         choices=[2, 3, 4],
         help="2=CP2 guardrails · 3=CP3 suite · 4=CP4 red-team",
     )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="Chạy Blue bằng dữ liệu mô phỏng, ghi CP3 vào outputs/offline/.",
+    )
     args = parser.parse_args()
-
-    if args.part:
-        asyncio.run(main(parts=[args.part]))
-    else:
-        asyncio.run(main())
+    if args.offline and args.part == 4:
+        parser.error("--offline chỉ hỗ trợ các checkpoint Blue.")
+    asyncio.run(main(parts=[args.part] if args.part else None, offline=args.offline))
