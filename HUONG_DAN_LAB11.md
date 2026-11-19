@@ -47,6 +47,27 @@ python src/hitl/hitl.py
 
 Ba lệnh trên chạy với dữ liệu mẫu mà không cần API key. Chế độ `--offline` chạy callback và bộ lọc thực với câu trả lời mô phỏng của model. Dùng chế độ này để lặp lại thử nghiệm và kiểm tra lớp nào can thiệp.
 
+### Demo trên trình duyệt
+
+Từ thư mục Lab 11, chạy lệnh sau trên macOS hoặc Linux. Khi đã kích hoạt môi trường Python, bạn cũng có thể chạy `python scripts/demo_ui.py`.
+
+```bash
+.venv/bin/python scripts/demo_ui.py
+```
+
+Mở [http://127.0.0.1:8765/](http://127.0.0.1:8765/) rồi chọn một tình huống và chạy demo. Xem trạng thái theo từng lớp trong dấu vết xử lý. Một lớp bị bỏ qua nghĩa là luồng chưa đi đến lớp đó. Audit và metrics cho biết độ trễ, số lượt và quyết định trong lần chạy. Nhấn `Ctrl+C` trong terminal để dừng.
+
+| Tình huống | Kết quả cần quan sát |
+| --- | --- |
+| Câu hỏi ngân hàng hoặc email chuyển khoản thông thường | Input guardrail cho qua. |
+| Yêu cầu ngoài phạm vi | Input guardrail chặn trước model. |
+| Phản hồi có PII mẫu | Output guardrail che trường nhạy cảm bằng `[REDACTED]`. |
+| Gửi 15 yêu cầu liên tiếp | Rate limit cho qua 10 lượt và chặn 5 lượt của cùng người dùng mô phỏng. |
+| Đích egress ngoài danh sách | Chính sách từ chối gửi dữ liệu. |
+| Đề xuất chuyển tiền có confidence cao | HITL chuyển đề xuất cho người có thẩm quyền xem xét. |
+
+Demo chạy bộ lọc Python của lab với câu trả lời model mô phỏng. Egress đánh giá địa chỉ đích và dữ liệu dự kiến gửi. HITL định tuyến hành động mô phỏng để người dùng thấy khi nào cần duyệt. Giao diện dùng dữ liệu mẫu và không cần API key.
+
 ## 3. Checkpoint 2 — Theo dấu đầu vào và đầu ra
 
 1. Mở `detect_injection()` và `topic_filter()`. Đọc theo thứ tự callback gọi hai hàm. `ALLOW` cho phép xử lý tiếp. `BLOCK` trả phản hồi từ chối tại lớp input. Chuẩn hóa phục vụ so khớp, giúp tránh khác biệt do dấu tiếng Việt hoặc ký tự Unicode vô hình.
@@ -119,4 +140,8 @@ python scripts/grade.py --submission-dir . --out outputs/grade_report.json
 
 Grader tạo `grade_report.json` và `lab_report.md`. Xem trường `technical_failure` và danh sách file bắt buộc để đọc trạng thái đóng gói. Bốn kiểm thử artifact sẽ hiện `skipped` nếu thiếu `outputs/results.json`. Có thể kiểm tra riêng schema của bản ngoại tuyến bằng lệnh ở mục 4.
 
-Rubric còn yêu cầu bằng chứng Red tại Checkpoint 4 và `outputs/attack_results.json`. Phần thực hành trong hướng dẫn này đi đến phòng thủ Blue, HITL và tự kiểm. Điểm và điều kiện đóng gói xem ở [RUBRIC.md](RUBRIC.md) và [SUBMISSION.md](SUBMISSION.md).
+### Còn thiếu gì để đủ bài nộp?
+
+1. **Checkpoint 3 (Blue chạy thật).** Cấu hình `OPENROUTER_API_KEY` ở máy rồi thực hiện lệnh chạy thật ở mục 4 để sinh và kiểm tra `outputs/results.json`. Giữ file `.env` ngoài Git.
+2. **Checkpoint 4 (bằng chứng Red).** Rubric yêu cầu `outputs/attack_results.json`. Mục này vẫn thiếu vì yêu cầu thiết kế prompt vượt guardrails để trích xuất bí mật. [RUBRIC.md](RUBRIC.md)
+3. **Checkpoint 5 (tự kiểm và nộp).** Khi có đủ hai artifact chính thức, chạy lại grader, kiểm tra kết quả rồi nộp liên kết repo theo quy định. [SUBMISSION.md](SUBMISSION.md)

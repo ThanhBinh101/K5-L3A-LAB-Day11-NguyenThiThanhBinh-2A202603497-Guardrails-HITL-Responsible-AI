@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Demo Lab 11 về Guardrails, HITL và Responsible AI.">
+  <title>Guardrails & HITL · Lab 11</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="frame topbar-inner">
+      <div class="identity">
+        <span class="mark" aria-hidden="true"><span></span></span>
+        <span>VinBank <span class="identity-divider"></span> <span class="identity-lab">Lab 11</span></span>
+      </div>
+      <div class="topbar-actions">
+        <a href="#tien-do">Tiến độ bài nộp</a>
+        <span class="local"><span aria-hidden="true"></span> Mô phỏng cục bộ</span>
+      </div>
+    </div>
+  </header>
+  <main class="frame">
+    <section class="intro" aria-labelledby="title">
+      <h1 id="title">Guardrails <span>&amp;</span> HITL</h1>
+      <p>Chọn một tình huống để theo dõi cách Blue xử lý yêu cầu, từ lọc đầu vào đến chuyển người duyệt.</p>
+    </section>
+
+    <div class="workspace">
+      <aside class="scenario-panel" aria-labelledby="scenario-title">
+        <h2 id="scenario-title">Kịch bản</h2>
+        <div id="scenario-list" class="scenario-list">
+          <p class="muted">Đang tải kịch bản…</p>
+        </div>
+      </aside>
+
+      <section class="workbench" aria-labelledby="case-title">
+        <form id="experiment">
+          <h2 id="case-title">Mô phỏng Blue</h2>
+          <p id="case-description" class="case-description">Đang kết nối với bộ kiểm thử cục bộ.</p>
+          <label id="input-label" for="input">Đầu vào</label>
+          <textarea id="input" rows="2" maxlength="2000" spellcheck="false" disabled></textarea>
+          <div class="form-actions">
+            <button id="run" class="primary" type="submit" disabled>Chạy kịch bản</button>
+            <button id="reset" class="secondary" type="button" disabled>Khôi phục mẫu</button>
+          </div>
+        </form>
+        <div class="result-heading">
+          <h2>Kết quả</h2>
+          <span id="verdict" class="verdict" role="status" hidden></span>
+        </div>
+        <p id="feedback" class="feedback" role="status" aria-live="polite">Đang tải…</p>
+        <div id="result" hidden>
+          <p id="reply" class="reply" aria-label="Phản hồi sau kiểm tra"></p>
+          <div id="burst" class="burst" hidden>
+            <div class="burst-labels">
+              <span id="passed-count"></span>
+              <span id="blocked-count"></span>
+            </div>
+            <div class="burst-bar" aria-hidden="true"><span id="passed-bar"></span></div>
+            <p id="burst-rule" class="muted"></p>
+          </div>
+          <ol id="trace" class="trace" aria-label="Các lớp đã chạy"></ol>
+          <details>
+            <summary>Nhật ký và chỉ số lần chạy</summary>
+            <dl id="audit" class="audit"></dl>
+          </details>
+        </div>
+      </section>
+    </div>
+
+    <section id="tien-do" class="progress" aria-labelledby="progress-title">
+      <h2 id="progress-title">Còn gì để hoàn thành?</h2>
+      <div class="progress-grid">
+        <article class="progress-item">
+          <span class="checkpoint">CHECKPOINT 2–3</span>
+          <h3>Chạy Blue với model thật</h3>
+          <p>Phần phòng thủ đã qua kiểm thử mô phỏng. Cấu hình <code>OPENROUTER_API_KEY</code> và chạy <code>python src/main.py --part 3</code> để sinh <code>outputs/results.json</code>.</p>
+        </article>
+        <article class="progress-item">
+          <span class="checkpoint">CHECKPOINT 4</span>
+          <h3>Bằng chứng Red theo rubric</h3>
+          <p>Đề yêu cầu <code>outputs/attack_results.json</code>. Artifact này hiện còn thiếu.</p>
+        </article>
+        <article class="progress-item">
+          <span class="checkpoint">CHECKPOINT 5</span>
+          <h3>Kiểm tra và nộp</h3>
+          <p>Khi đã có đủ artifact chính thức, chạy <code>scripts/grade.py</code>, xem báo cáo và nộp link repo theo <code>SUBMISSION.md</code>.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
